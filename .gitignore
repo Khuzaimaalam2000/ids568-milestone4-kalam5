@@ -1,0 +1,15 @@
+# Python virtual environment
+venv/
+.env/
+__pycache__/
+*.pyc
+
+# Data folders
+big_data/
+small_data/
+
+# OS files
+.DS_Storevenv/
+data/
+output/
+*.csv
