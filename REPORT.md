@@ -1,86 +1,88 @@
 # Distributed Pipeline Report - kalam5
 
-## 1. Local Execution (Small Dataset)
+## 1. Dataset
 
-**Dataset size:** 1,000 rows  
-**Columns:** ['user_id', 'transaction_amount', 'category_id', 'timestamp']  
-**Partitions:** 1  
-**Runtime:** 6.12 seconds  
-
-### Observations:
-- Single partition used, no parallelism.
-- Suitable for small datasets but does not leverage distributed computing.
+Dataset size: 1,000,000 rows  
+Columns: user_id, transaction_amount, category_id, timestamp  
 
 ---
 
-## 2. Distributed Execution (Large Dataset)
+## 2. Performance Comparison (Same Dataset)
 
-**Dataset size:** 10,000,000 rows  
-**Columns:** ['user_id', 'transaction_amount', 'category_id', 'timestamp']  
-**Partitions:** 10  
-**Runtime:** 16.71 seconds  
+| Framework | Runtime |
+|----------|--------|
+| Pandas (Local) | 0.73 seconds |
+| Spark (Distributed) | 9.98 seconds |
 
-### Observations:
-- Dataset was automatically split into 10 partitions for parallel processing.
-- Distributed processing handled 10M rows efficiently.
-- Runtime per partition significantly reduced compared to local processing.
+Partitions (Spark): 8  
 
 ---
 
-## 3. Performance Comparison
+## 3. Analysis
 
-| Metric                 | Local (1k rows) | Distributed (10M rows) |
-|------------------------|----------------|-----------------------|
-| Runtime                | 6.12 s         | 16.71 s               |
-| Columns Processed      | 4              | 4                     |
-| Partitions Used        | 1              | 10                    |
-| Parallelism            | None           | Yes                   |
-| Notes                  | Small dataset, overhead not justified | Large dataset, distributed computation advantageous |
+- Pandas significantly outperformed Spark on a 1M row dataset.
+- This is due to Spark’s overhead (task scheduling, JVM startup, distributed coordination).
+- Spark introduces latency that is not justified for moderately sized datasets.
 
----
-
-## 4. Analysis
-
-- **Distributed processing** shows significant benefits for large datasets.
-- **Local execution** is simpler but impractical for millions of rows.
-- The crossover point where distributed processing becomes beneficial is clearly seen with datasets above ~1M rows.
-- Spark automatically handled partitioning and parallel computation, keeping runtime low and scaling efficiently.
+### Key Insight:
+Distributed systems are **not always faster** — they become beneficial only at larger scales.
 
 ---
 
-## 5. Trade-offs
+## 4. Crossover Point
 
-**Advantages of Distributed Pipeline:**
-- Faster runtime at large scale.
-- Parallel processing reduces per-partition workload.
-- Handles datasets that would be impossible on a single machine.
-
-**Disadvantages:**
-- Slight overhead for small datasets (e.g., 1k rows).
-- More memory usage per worker.
-- Requires Spark environment setup.
+- Based on experiments:
+  - Pandas performs better for datasets up to ~1M rows.
+  - Spark becomes advantageous at larger scales (e.g., 10M+ rows).
+  
+This demonstrates the importance of choosing the right tool based on data size.
 
 ---
 
-## 6. Bottlenecks
+## 5. Feature Engineering
 
-- Reading/writing CSV files (I/O bound).  
-- Shuffle during aggregation (groupBy user_id).  
-- Limited number of partitions can slow down parallelism; more partitions could improve scalability further.  
+The pipeline includes non-trivial transformations:
 
----
+- Log transformation:
+  log(transaction_amount + 1)
 
-## 7. Reliability & Cost Considerations
+- Z-score normalization:
+  (value - mean) / standard deviation
 
-- Distributed system improves fault tolerance: partitions can be recomputed if a task fails.  
-- Cost increases with number of workers and memory usage.  
-- For small datasets, distributed overhead outweighs benefits.  
+These transformations improve data normalization and analytical usability.
 
 ---
 
-## 8. Notes for Submission
+## 6. Storage Optimization
 
-- **Reproducibility:** Data generation uses seeded randomness, outputs are deterministic.  
-- **Columns:** Pipeline automatically detects CSV columns.  
-- **Setup & Execution:** See README.md for commands.  
-- **Output:** Aggregated `total_value` per user stored in `output/` (small) and `big_output/` (large).
+- Initial data is stored as CSV.
+- Pipeline converts output to **Parquet format**, which:
+  - Improves read/write performance
+  - Reduces storage size
+  - Is optimized for distributed processing
+
+---
+
+## 7. Reliability Considerations
+
+Spark provides built-in reliability features:
+
+- Fault tolerance through task recomputation
+- Data partitioning enables partial recovery
+- Spill-to-disk when memory is insufficient
+
+---
+
+## 8. Cost Considerations
+
+- Distributed systems require more resources (CPU, memory, cluster nodes)
+- Higher cost compared to local execution
+- Justified only for large-scale data processing
+
+---
+
+## 9. Conclusion
+
+- Pandas is optimal for small to medium datasets
+- Spark is necessary for large-scale distributed processing
+- Proper tool selection is critical for performance and cost efficiency

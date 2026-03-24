@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, sum, avg
+from pyspark.sql.functions import col, sum, avg, log, mean, stddev
 import argparse
 import time
 
@@ -12,18 +12,32 @@ def run_pipeline(input_path, output_path):
 
     df = spark.read.csv(input_path, header=True, inferSchema=True)
 
-    print("Columns in CSV:", df.columns)
+    print("Columns:", df.columns)
     print("Partitions:", df.rdd.getNumPartitions())
 
-    # Feature Engineering — adjust to your CSV columns
-    df = df.withColumn("total_value", col("transaction_amount") * 1)  # use 1 if no quantity
+    # ✅ REAL FEATURE ENGINEERING
+    df = df.withColumn("log_amount", log(col("transaction_amount") + 1))
 
+    stats = df.select(
+        mean("transaction_amount").alias("mean"),
+        stddev("transaction_amount").alias("std")
+    ).collect()[0]
+
+    mean_val = stats["mean"]
+    std_val = stats["std"]
+
+    df = df.withColumn(
+        "z_score",
+        (col("transaction_amount") - mean_val) / std_val
+    )
+
+    # Aggregation
     result = df.groupBy("user_id").agg(
-        sum("total_value").alias("total_spent"),
+        sum("transaction_amount").alias("total_spent"),
         avg("transaction_amount").alias("avg_transaction")
     )
 
-    result.write.mode("overwrite").csv(output_path)
+    result.write.mode("overwrite").parquet(output_path)
 
     end = time.time()
     print(f"Runtime: {end - start} seconds")
