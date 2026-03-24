@@ -52,7 +52,30 @@ GroupBy user_id producing: total_spent, avg_transaction, num_transactions, avg_z
 
 See performance.png for visualization.
 
----
+### Memory & Shuffle Metrics
+
+| Metric | Value |
+|---|---|
+| Default parallelism | 4 |
+| Executor memory | 2g (configured in pipeline) |
+| Driver memory | JVM default (~1g) |
+| Spark mode | local[4] (4 threads) |
+
+### Shuffle Behavior by Dataset Size
+
+| Dataset | Partitions | Shuffle Triggered By | Notes |
+|---|---|---|---|
+| 1K | 1 | groupBy + window | No spill observed |
+| 100K | 1 | groupBy + window | No spill observed |
+| 1M | 4 | groupBy + window | Minor shuffle, no spill |
+| 10M | 5 | groupBy + window | Shuffle significant, no spill |
+
+**Shuffle notes:**
+- groupBy(user_id) triggers a full shuffle — all rows for the same user_id 
+  must be co-located on the same partition
+- Window function (running_total) also triggers shuffle + sort per partition
+- No spill-to-disk observed at any tested size under 2g executor memory
+- Spill would be expected at ~50M+ rows with current memory config
 
 ## 4. Crossover Analysis
 
